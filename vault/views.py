@@ -5,7 +5,9 @@ from django.contrib.auth import authenticate, login
 from django.http import FileResponse, HttpResponseForbidden, HttpResponse
 from django.db.models import Q
 from django.contrib.auth.models import User
+
 from .models import Document, AuditLog, DocumentPermission, Profile
+
 import os
 import hashlib
 import json
@@ -169,7 +171,11 @@ def upload_document(request):
 @login_required
 def download_document(request, document_id):
 
-    document = get_object_or_404(Document, id=document_id)
+    document = get_object_or_404(
+        Document,
+        id=document_id,
+        is_deleted=False
+    )
 
     allowed = (
         request.user.is_superuser or
@@ -236,13 +242,16 @@ def viewer_login(request):
 def document_list(request):
 
     documents = Document.objects.filter(
-        owner=request.user
+        owner=request.user,
+        is_deleted=False
     ) | Document.objects.filter(
         documentpermission__user=request.user,
-        documentpermission__can_read=True
+        documentpermission__can_read=True,
+        is_deleted=False
     ) | Document.objects.filter(
         documentpermission__user=request.user,
-        documentpermission__can_edit=True
+        documentpermission__can_edit=True,
+        is_deleted=False
     )
 
     documents = documents.distinct()
@@ -274,14 +283,15 @@ def search_documents(request):
     search_date = request.GET.get('date', '')
 
     if request.user.is_superuser:
-        documents = Document.objects.all()
+        documents = Document.objects.filter(is_deleted=False)
     else:
         documents = Document.objects.filter(
             Q(owner=request.user) |
             Q(documentpermission__user=request.user,
               documentpermission__can_read=True) |
             Q(documentpermission__user=request.user,
-              documentpermission__can_edit=True)
+              documentpermission__can_edit=True),
+            is_deleted=False
         ).distinct()
 
     if query:
@@ -309,9 +319,14 @@ def admin_dashboard(request):
     if not request.user.is_superuser:
         return HttpResponseForbidden("Admin access only.")
 
-    total_documents = Document.objects.count()
+    total_documents = Document.objects.filter(
+        is_deleted=False
+    ).count()
+
     total_users = User.objects.count()
-    total_permissions = DocumentPermission.objects.count()
+    total_permissions = DocumentPermission.objects.filter(
+        document__is_deleted=False
+    ).count()
 
     recent_activities = AuditLog.objects.order_by(
         '-timestamp'
@@ -328,7 +343,11 @@ def admin_dashboard(request):
 @login_required
 def edit_document(request, document_id):
 
-    document = get_object_or_404(Document, id=document_id)
+    document = get_object_or_404(
+        Document,
+        id=document_id,
+        is_deleted=False
+    )
 
     permission = DocumentPermission.objects.filter(
         document=document,
@@ -377,7 +396,11 @@ def edit_document(request, document_id):
 @login_required
 def delete_document(request, document_id):
 
-    document = get_object_or_404(Document, id=document_id)
+    document = get_object_or_404(
+        Document,
+        id=document_id,
+        is_deleted=False
+    )
 
     allowed = (
         request.user.is_superuser or
@@ -403,10 +426,11 @@ def delete_document(request, document_id):
             document=document,
             action='DELETE',
             status='SUCCESS',
-            details='Deleted document: ' + document_title
+            details='Document moved to deleted status: ' + document_title
         )
 
-        document.delete()
+        document.is_deleted = True
+        document.save(update_fields=['is_deleted'])
 
         return redirect('document_list')
 
@@ -426,9 +450,12 @@ def manage_permissions(request):
         return HttpResponseForbidden("Permission management denied.")
 
     if request.user.is_superuser or role == 'ADMIN':
-        documents = Document.objects.all()
+        documents = Document.objects.filter(is_deleted=False)
     else:
-        documents = Document.objects.filter(owner=request.user)
+        documents = Document.objects.filter(
+            owner=request.user,
+            is_deleted=False
+        )
 
     users = User.objects.filter(is_active=True)
     message = ""

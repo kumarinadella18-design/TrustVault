@@ -26,6 +26,7 @@ class Document(models.Model):
     file = models.FileField(upload_to='documents/')
     category = models.CharField(max_length=100)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
@@ -65,36 +66,38 @@ class AuditLog(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        if self.pk is None:
-            previous = AuditLog.objects.order_by('-id').first()
-
-            self.previous_hash = (
-                previous.record_hash if previous else 'GENESIS'
+        if self.pk is not None:
+            raise ValueError(
+                "Existing audit records cannot be edited."
             )
 
-            super().save(*args, **kwargs)
+        previous = AuditLog.objects.order_by('-id').first()
 
-            data = {
-                'actor': self.actor_id,
-                'document': self.document_id,
-                'action': self.action,
-                'status': self.status,
-                'details': self.details,
-                'timestamp': self.timestamp.isoformat(),
-                'previous_hash': self.previous_hash
-            }
+        self.previous_hash = (
+            previous.record_hash if previous else 'GENESIS'
+        )
 
-            content = json.dumps(data, sort_keys=True)
+        super().save(*args, **kwargs)
 
-            self.record_hash = hashlib.sha256(
-                content.encode()
-            ).hexdigest()
+        data = {
+            'actor': self.actor_id,
+            'document': self.document_id,
+            'action': self.action,
+            'status': self.status,
+            'details': self.details,
+            'timestamp': self.timestamp.isoformat(),
+            'previous_hash': self.previous_hash
+        }
 
-            AuditLog.objects.filter(pk=self.pk).update(
-                record_hash=self.record_hash
-            )
-        else:
-            super().save(*args, **kwargs)
+        content = json.dumps(data, sort_keys=True)
+
+        self.record_hash = hashlib.sha256(
+            content.encode()
+        ).hexdigest()
+
+        AuditLog.objects.filter(pk=self.pk).update(
+            record_hash=self.record_hash
+        )
 
     def __str__(self):
         return self.action + " - " + self.status

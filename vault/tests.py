@@ -106,7 +106,6 @@ class TrustVaultSecurityTests(TestCase):
             details='Original upload'
         )
 
-        # Change the audit record without recalculating its hash.
         AuditLog.objects.filter(pk=log.pk).update(
             details='Modified upload'
         )
@@ -120,3 +119,51 @@ class TrustVaultSecurityTests(TestCase):
             response,
             'WARNING: Audit logs may have been modified!'
         )
+
+    def test_existing_audit_log_cannot_be_edited(self):
+        log = AuditLog.objects.create(
+            actor=self.owner,
+            document=self.document,
+            action='UPLOAD',
+            status='SUCCESS',
+            details='Original upload'
+        )
+
+        log.details = 'Changed upload'
+
+        with self.assertRaises(ValueError):
+            log.save()
+
+    def test_document_soft_delete(self):
+        self.client.force_login(self.owner)
+
+        self.client.post(
+            f'/delete/{self.document.id}/'
+        )
+
+        self.document.refresh_from_db()
+
+        self.assertTrue(self.document.is_deleted)
+        self.assertTrue(
+            Document.objects.filter(id=self.document.id).exists()
+        )
+
+        self.assertTrue(
+            AuditLog.objects.filter(
+                document=self.document,
+                action='DELETE',
+                status='SUCCESS'
+            ).exists()
+        )
+
+    def test_deleted_document_cannot_be_downloaded(self):
+        self.document.is_deleted = True
+        self.document.save(update_fields=['is_deleted'])
+
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            f'/download/{self.document.id}/'
+        )
+
+        self.assertEqual(response.status_code, 404)
