@@ -1,0 +1,46 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TrustVault - Search Documents</title>
+</head>
+<body>
+
+    <h2>Search Documents</h2>
+
+    <form method="GET" action="{% url 'search_documents' %}">
+
+    <input type="text" name="q"
+           placeholder="Search by name, owner or category"
+           value="{{ query }}">
+
+    <br><br>
+
+    <label>Search by Upload Date:</label>
+    <input type="date" name="date" value="{{ search_date }}">
+
+    <br><br>
+
+    <button type="submit">Search</button>
+
+</form>
+
+    <h3>Search Results</h3>
+
+    {% for document in documents %}
+        <p>
+            <b>{{ document.title }}</b><br>
+            Owner: {{ document.owner.username }}<br>
+            Category: {{ document.category }}<br>
+            Uploaded: {{ document.uploaded_at }}<br>
+            <a href="{% url 'download' document.id %}">Download</a>
+        </p>
+        <hr>
+    {% empty %}
+        <p>No documents found.</p>
+    {% endfor %}
+
+    <a href="{% url 'document_list' %}">Back to Documents</a>
+
+</body>
+</html>
