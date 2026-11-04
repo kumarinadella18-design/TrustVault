@@ -43,7 +43,7 @@ The system provides role-based access control and maintains activity records to 
 - **Frontend:** HTML, CSS
 - **Database:** Local development database
 - **Development Tool:** Visual Studio Code
-- **Version Control:** Git and GitHub (planned)
+- **Version Control:** Git and GitHub
 
 ## 5. File Validation
 
@@ -94,8 +94,11 @@ TrustVault/
 │   └── tests.py
 │
 ├── manage.py
+├── requirements.txt
 ├── README.md
-└── .venv/
+├── THREATS.md
+├── PROMPTS.md
+└── .gitignore
 ```
 
 ## 8. Installation and Setup
@@ -120,10 +123,10 @@ py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### Step 4: Install Django
+### Step 4: Install project dependencies
 
 ```powershell
-py -m pip install django
+py -m pip install -r requirements.txt
 ```
 
 ### Step 5: Apply database migrations
@@ -146,9 +149,7 @@ py manage.py runserver
 
 Open the following address in your browser:
 
-```text
 http://127.0.0.1:8000/
-```
 
 ## 9. Important Application URLs
 
