@@ -17,3 +17,7 @@ staticfiles/
 .vscode/
 .DS_Store
 Thumbs.db
+
+accounts_backup.json
+db_backup*.sqlite3
+vault/models_backup.py

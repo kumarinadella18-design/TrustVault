@@ -1,0 +1,28 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TrustVault - My Documents</title>
+</head>
+<body>
+    <h2>My Shared Documents</h2>
+
+    {% for doc in documents %}
+        <p>
+            {{ doc.title }}
+
+            <a href="{% url 'download' doc.id %}">Download</a>
+
+            {% if doc.can_edit %}
+                <a href="{% url 'edit_document' doc.id %}">Edit</a>
+            {% endif %}
+
+            {% if doc.can_delete %}
+                <a href="{% url 'delete_document' doc.id %}">Delete</a>
+            {% endif %}
+        </p>
+    {% empty %}
+        <p>No documents available.</p>
+    {% endfor %}
+</body>
+</html>

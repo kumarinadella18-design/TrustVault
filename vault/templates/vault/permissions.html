@@ -1,0 +1,61 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TrustVault - Manage Permissions</title>
+</head>
+<body>
+
+    <h1>Document Permission Management</h1>
+
+    <p style="color:green;">{{ message }}</p>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <label>Select Document:</label>
+        <select name="document" required>
+            {% for doc in documents %}
+                <option value="{{ doc.id }}">
+                    {{ doc.title }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <br><br>
+
+        <label>Select User:</label>
+        <select name="username" required>
+            {% for user in users %}
+                <option value="{{ user.username }}">
+                    {{ user.username }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <br><br>
+
+        <label>
+            <input type="checkbox" name="can_read">
+            Read Permission
+        </label>
+
+        <br><br>
+
+        <label>
+            <input type="checkbox" name="can_edit">
+            Edit Permission
+        </label>
+
+        <br><br>
+
+        <button type="submit">Save Permission</button>
+
+    </form>
+
+    <br>
+
+    <a href="{% url 'document_list' %}">Back to Documents</a>
+
+</body>
+</html>

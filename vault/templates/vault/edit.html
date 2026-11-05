@@ -1,0 +1,35 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TrustVault - Edit Document</title>
+</head>
+<body>
+
+    <h2>Edit Document</h2>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <label>Document Title:</label>
+        <input type="text" name="title"
+               value="{{ document.title }}" required>
+
+        <br><br>
+
+        <label>Category:</label>
+        <input type="text" name="category"
+               value="{{ document.category }}" required>
+
+        <br><br>
+
+        <button type="submit">Update Document</button>
+
+    </form>
+
+    <br>
+
+    <a href="{% url 'document_list' %}">Back to Documents</a>
+
+</body>
+</html>
