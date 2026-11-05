@@ -1,18 +1,21 @@
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-from django.http import FileResponse, HttpResponseForbidden, HttpResponse
+from django.http import FileResponse, HttpResponseForbidden, HttpResponse, HttpResponseRedirect
 from django.db.models import Q
 from django.contrib.auth.models import User
 
 from .models import Document, AuditLog, DocumentPermission, Profile
+from .cloud_storage import upload_to_cloudinary, get_cloudinary_download_url
 
 import os
 import hashlib
 import json
 import io
 import zipfile
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_audit_hash(log):
@@ -146,22 +149,32 @@ def upload_document(request):
             error = verify_uploaded_file(uploaded_file)
 
             if not error:
-                document = Document.objects.create(
-                    owner=request.user,
-                    title=title,
-                    category=category,
-                    file=uploaded_file
-                )
+                try:
+                    uploaded_file.seek(0)
 
-                AuditLog.objects.create(
-                    actor=request.user,
-                    document=document,
-                    action='UPLOAD',
-                    status='SUCCESS',
-                    details='Document uploaded successfully'
-                )
+                    public_id = upload_to_cloudinary(uploaded_file)
 
-                return redirect('upload')
+                    document = Document.objects.create(
+                        owner=request.user,
+                        title=title,
+                        category=category,
+                        file='documents/' + uploaded_file.name,
+                        cloudinary_public_id=public_id
+                    )
+
+                    AuditLog.objects.create(
+                        actor=request.user,
+                        document=document,
+                        action='UPLOAD',
+                        status='SUCCESS',
+                        details='Document uploaded to Cloudinary'
+                    )
+
+                    return redirect('upload')
+
+                except Exception:
+                    logger.exception("DOCUMENT UPLOAD ERROR")
+                    error = "Cloudinary upload failed. Please try again."
 
     return render(request, 'vault/upload.html', {
         'error': error
@@ -171,48 +184,77 @@ def upload_document(request):
 @login_required
 def download_document(request, document_id):
 
-    document = get_object_or_404(
-        Document,
-        id=document_id,
-        is_deleted=False
-    )
+    try:
+        document = get_object_or_404(
+            Document,
+            id=document_id,
+            is_deleted=False
+        )
 
-    allowed = (
-        request.user.is_superuser or
-        document.owner == request.user
-    )
+        allowed = (
+            request.user.is_superuser or
+            document.owner == request.user
+        )
 
-    permission = DocumentPermission.objects.filter(
-        document=document,
-        user=request.user
-    ).first()
+        permission = DocumentPermission.objects.filter(
+            document=document,
+            user=request.user
+        ).first()
 
-    if permission and (permission.can_read or permission.can_edit):
-        allowed = True
+        if permission and (permission.can_read or permission.can_edit):
+            allowed = True
 
-    if not allowed:
+        if not allowed:
+            AuditLog.objects.create(
+                actor=request.user,
+                document=document,
+                action='DOWNLOAD',
+                status='DENIED',
+                details='Unauthorized download attempt'
+            )
+            return HttpResponseForbidden("Access Denied")
+
+        if document.cloudinary_public_id:
+
+            filename = document.file.name.split('/')[-1]
+
+            download_url = get_cloudinary_download_url(
+                document.cloudinary_public_id,
+                filename
+            )
+
+            AuditLog.objects.create(
+                actor=request.user,
+                document=document,
+                action='DOWNLOAD',
+                status='SUCCESS',
+                details='Document downloaded from Cloudinary'
+            )
+
+            return HttpResponseRedirect(download_url)
+
+        file_object = document.file.open('rb')
+
         AuditLog.objects.create(
             actor=request.user,
             document=document,
             action='DOWNLOAD',
-            status='DENIED',
-            details='Unauthorized download attempt'
+            status='SUCCESS',
+            details='Document downloaded successfully'
         )
-        return HttpResponseForbidden("Access Denied")
 
-    AuditLog.objects.create(
-        actor=request.user,
-        document=document,
-        action='DOWNLOAD',
-        status='SUCCESS',
-        details='Document downloaded successfully'
-    )
+        return FileResponse(
+            file_object,
+            as_attachment=True,
+            filename=document.file.name.split('/')[-1]
+        )
 
-    return FileResponse(
-        document.file.open('rb'),
-        as_attachment=True,
-        filename=document.file.name.split('/')[-1]
-    )
+    except Exception:
+        logger.exception("DOCUMENT DOWNLOAD ERROR")
+        return HttpResponse(
+            "Download failed. Please check Render logs.",
+            status=500
+        )
 
 
 def viewer_login(request):
@@ -324,6 +366,7 @@ def admin_dashboard(request):
     ).count()
 
     total_users = User.objects.count()
+
     total_permissions = DocumentPermission.objects.filter(
         document__is_deleted=False
     ).count()

@@ -24,6 +24,9 @@ class Document(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
     file = models.FileField(upload_to='documents/')
+    cloudinary_public_id = models.CharField(
+        max_length=255, blank=True, default=''
+    )
     category = models.CharField(max_length=100)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
