@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / '.env')
+
 SECRET_KEY = os.environ.get(
     'DJANGO_SECRET_KEY',
     'local-development-key-change-before-deployment'
@@ -27,7 +28,8 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
-        'CSRF_TRUSTED_ORIGINS', ''
+        'CSRF_TRUSTED_ORIGINS',
+        'https://trustvault-ashu.onrender.com'
     ).split(',')
     if origin.strip()
 ]
