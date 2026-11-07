@@ -1,3 +1,4 @@
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
@@ -73,6 +74,7 @@ def verify_uploaded_file(uploaded_file):
     uploaded_file.seek(0)
     return ""
 
+
 @login_required
 def verify_audit_logs(request):
 
@@ -84,39 +86,59 @@ def verify_audit_logs(request):
     previous_hash = None
     checked_count = 0
     old_count = 0
+    unverified_count = 0
+    chain_broken = False
+    verification_started = False
 
     for log in logs:
 
         if not log.record_hash:
             old_count += 1
+
+            if verification_started:
+                chain_broken = True
+
+            continue
+
+        if chain_broken:
+            unverified_count += 1
             continue
 
         expected_hash = calculate_audit_hash(log)
 
         if expected_hash != log.record_hash:
-            return HttpResponse(
-                "HASH MISMATCH at ID: " + str(log.id) +
-                "\nExpected: " + expected_hash +
-                "\nSaved: " + log.record_hash,
-                content_type="text/plain"
-            )
+            chain_broken = True
+            unverified_count += 1
+            continue
 
-        if previous_hash is not None:
+        if not verification_started:
+            if log.previous_hash not in ['', 'GENESIS']:
+                chain_broken = True
+                unverified_count += 1
+                continue
+        else:
             if log.previous_hash != previous_hash:
-                return HttpResponse(
-                    "CHAIN MISMATCH at ID: " + str(log.id),
-                    content_type="text/plain"
-                )
+                chain_broken = True
+                unverified_count += 1
+                continue
 
         previous_hash = log.record_hash
+        verification_started = True
         checked_count += 1
 
+    if unverified_count:
+        result = "WARNING: Audit chain verification failed."
+    else:
+        result = "SUCCESS: All protected audit logs are valid."
+
     return HttpResponse(
-        "SUCCESS: All protected audit logs are valid." +
-        "\nProtected records checked: " + str(checked_count) +
+        result +
+        "\nProtected records verified: " + str(checked_count) +
+        "\nUnverified records: " + str(unverified_count) +
         "\nOlder unprotected records: " + str(old_count),
         content_type="text/plain"
     )
+
 
 
 @login_required
