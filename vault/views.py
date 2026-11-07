@@ -596,10 +596,22 @@ def fix_render_audit_hashes(request):
     if not request.user.is_superuser:
         return HttpResponse("Unauthorized", status=401)
     
+    logs = AuditLog.objects.all().order_by('id')
     updated_count = 0
-    for log in AuditLog.objects.filter(id__in=[23, 24, 25, 26, 27]):
+    prev_hash = "GENESIS"  # Or your model's initial genesis hash string if applicable
+    
+    for log in logs:
+        # If your calculate_audit_hash depends on previous_hash field, update it first in memory
+        log.previous_hash = prev_hash
         new_hash = calculate_audit_hash(log)
-        AuditLog.objects.filter(id=log.id).update(record_hash=new_hash)
-        updated_count += 1
         
-    return HttpResponse(f"Successfully updated {updated_count} audit log records.")
+        # Directly update both record_hash and previous_hash in DB to fix the chain
+        AuditLog.objects.filter(id=log.id).update(
+            previous_hash=prev_hash,
+            record_hash=new_hash
+        )
+        
+        prev_hash = new_hash
+        updated_count += 1
+
+    return HttpResponse(f"Successfully repaired entire chain for {updated_count} audit logs!")
