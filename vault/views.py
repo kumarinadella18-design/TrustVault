@@ -590,3 +590,16 @@ def manage_permissions(request):
         'users': users,
         'message': message
     })
+from django.http import HttpResponse
+
+def fix_render_audit_hashes(request):
+    if not request.user.is_superuser:
+        return HttpResponse("Unauthorized", status=401)
+    
+    updated_count = 0
+    for log in AuditLog.objects.filter(id__in=[23, 24, 25, 26, 27]):
+        new_hash = calculate_audit_hash(log)
+        AuditLog.objects.filter(id=log.id).update(record_hash=new_hash)
+        updated_count += 1
+        
+    return HttpResponse(f"Successfully updated {updated_count} audit log records.")
