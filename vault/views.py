@@ -73,7 +73,6 @@ def verify_uploaded_file(uploaded_file):
     uploaded_file.seek(0)
     return ""
 
-
 @login_required
 def verify_audit_logs(request):
 
@@ -93,19 +92,16 @@ def verify_audit_logs(request):
             old_count += 1
             continue
 
-        if previous_hash is None:
-            if log.previous_hash not in ['', 'GENESIS']:
-                tampered = True
-                break
-        elif log.previous_hash != previous_hash:
-            tampered = True
-            break
-
         expected_hash = calculate_audit_hash(log)
 
         if expected_hash != log.record_hash:
             tampered = True
             break
+
+        if previous_hash is not None:
+            if log.previous_hash != previous_hash:
+                tampered = True
+                break
 
         previous_hash = log.record_hash
         checked_count += 1
