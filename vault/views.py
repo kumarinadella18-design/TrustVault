@@ -75,6 +75,7 @@ def verify_uploaded_file(uploaded_file):
     return ""
 
 
+
 @login_required
 def verify_audit_logs(request):
 
@@ -83,63 +84,56 @@ def verify_audit_logs(request):
 
     logs = AuditLog.objects.order_by('id')
 
-    previous_hash = None
     checked_count = 0
     old_count = 0
-    unverified_count = 0
-    chain_broken = False
-    verification_started = False
+    hash_mismatches = []
+    chain_mismatches = []
+
+    previous_hash = None
+    first_protected = True
 
     for log in logs:
 
         if not log.record_hash:
             old_count += 1
-
-            if verification_started:
-                chain_broken = True
-
             continue
 
-        if chain_broken:
-            unverified_count += 1
-            continue
+        checked_count += 1
 
+        # Verify individual record hash
         expected_hash = calculate_audit_hash(log)
 
         if expected_hash != log.record_hash:
-            chain_broken = True
-            unverified_count += 1
-            continue
+            hash_mismatches.append(log.id)
 
-        if not verification_started:
+        # Verify chain connection
+        if first_protected:
             if log.previous_hash not in ['', 'GENESIS']:
-                chain_broken = True
-                unverified_count += 1
-                continue
+                chain_mismatches.append(log.id)
+
+            first_protected = False
+
         else:
             if log.previous_hash != previous_hash:
-                chain_broken = True
-                unverified_count += 1
-                continue
+                chain_mismatches.append(log.id)
 
         previous_hash = log.record_hash
-        verification_started = True
-        checked_count += 1
 
-    if unverified_count:
-        result = "WARNING: Audit chain verification failed."
+    if hash_mismatches or chain_mismatches:
+        result = "WARNING: Audit verification failed."
     else:
         result = "SUCCESS: All protected audit logs are valid."
 
     return HttpResponse(
         result +
-        "\nProtected records verified: " + str(checked_count) +
-        "\nUnverified records: " + str(unverified_count) +
+        "\nProtected records checked: " + str(checked_count) +
+        "\nHash mismatches: " + str(len(hash_mismatches)) +
+        "\nHash mismatch IDs: " + str(hash_mismatches) +
+        "\nChain link mismatches: " + str(len(chain_mismatches)) +
+        "\nChain mismatch IDs: " + str(chain_mismatches) +
         "\nOlder unprotected records: " + str(old_count),
         content_type="text/plain"
     )
-
-
 
 @login_required
 def upload_document(request):
