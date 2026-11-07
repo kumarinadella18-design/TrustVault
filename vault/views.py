@@ -84,7 +84,6 @@ def verify_audit_logs(request):
     previous_hash = None
     checked_count = 0
     old_count = 0
-    tampered = False
 
     for log in logs:
 
@@ -95,24 +94,25 @@ def verify_audit_logs(request):
         expected_hash = calculate_audit_hash(log)
 
         if expected_hash != log.record_hash:
-            tampered = True
-            break
+            return HttpResponse(
+                "HASH MISMATCH at ID: " + str(log.id) +
+                "\nExpected: " + expected_hash +
+                "\nSaved: " + log.record_hash,
+                content_type="text/plain"
+            )
 
         if previous_hash is not None:
             if log.previous_hash != previous_hash:
-                tampered = True
-                break
+                return HttpResponse(
+                    "CHAIN MISMATCH at ID: " + str(log.id),
+                    content_type="text/plain"
+                )
 
         previous_hash = log.record_hash
         checked_count += 1
 
-    if tampered:
-        result = "WARNING: Audit logs may have been modified!"
-    else:
-        result = "SUCCESS: All protected audit logs are valid."
-
     return HttpResponse(
-        result +
+        "SUCCESS: All protected audit logs are valid." +
         "\nProtected records checked: " + str(checked_count) +
         "\nOlder unprotected records: " + str(old_count),
         content_type="text/plain"
